@@ -1,0 +1,153 @@
+{
+  "$comment": [
+    "ONE corpus, read by BOTH adapters. This file is the subject of the",
+    "conformance claim: 'the Python middleware and the Kong plugin enforce the",
+    "same contract' is only checkable if there is a single artefact they are",
+    "both checked against.",
+    "",
+    "Two separate test suites, each written against its own implementation,",
+    "cannot establish this. They can both be green while disagreeing, because",
+    "each asserts what its own code does. That is the failure this file exists",
+    "to make impossible: a divergence fails a test rather than passing two.",
+    "",
+    "Cases are grouped by the pure decision each adapter makes. Only pure",
+    "logic lives here — path matching, header classification, response",
+    "reading. Anything needing a network or a database belongs in the",
+    "integration suites, not in a corpus that must run identically in Lua and",
+    "Python."
+  ],
+  "corpus_version": "1",
+
+  "protected_path_matching": {
+    "$comment": [
+      "A protected path guards a prefix boundary, not a string prefix. '/mcp'",
+      "must cover '/mcp' and everything below it, and must NOT cover a",
+      "different resource whose name merely starts with the same characters.",
+      "",
+      "'/mcpfoo' and '/mcp-evil' are the cases that matter: a naive",
+      "startswith() accepts both, and an attacker who can name a route picks",
+      "exactly that shape. Getting it wrong sends unprotected traffic through",
+      "an enforcement point that believes it is enforcing."
+    ],
+    "configured": ["/mcp"],
+    "cases": [
+      { "path": "/mcp",            "protected": true,  "why": "exact match" },
+      { "path": "/mcp/",           "protected": true,  "why": "trailing slash is the same resource" },
+      { "path": "/mcp/tools",      "protected": true,  "why": "descendant, separated by /" },
+      { "path": "/mcp/a/b/c",      "protected": true,  "why": "deep descendant" },
+      { "path": "/mcpfoo",         "protected": false, "why": "different resource; a prefix compare would accept it" },
+      { "path": "/mcp-evil",       "protected": false, "why": "different resource; hyphen is not a separator" },
+      { "path": "/mcpevil/tools",  "protected": false, "why": "different resource, even with a descendant" },
+      { "path": "/",               "protected": false, "why": "the root is not the protected surface" },
+      { "path": "/other",          "protected": false, "why": "unrelated" },
+      { "path": "/api/mcp",        "protected": false, "why": "the boundary is anchored at the start, not searched for" }
+    ]
+  },
+
+  "reserved_headers": {
+    "$comment": [
+      "Reserved headers carry MudraID's own context to the upstream. A CALLER",
+      "supplying one is attempting to inject authority it was never granted,",
+      "so they are stripped before evaluation — every one of them, regardless",
+      "of case, because HTTP header names are case-insensitive and an",
+      "adapter that only stripped the lowercase spelling would strip nothing",
+      "an attacker actually sends."
+    ],
+    "cases": [
+      { "header": "x-mudraid-agent-id",       "reserved": true },
+      { "header": "X-MudraID-Agent-Id",       "reserved": true },
+      { "header": "X-MUDRAID-ANYTHING",       "reserved": true },
+      { "header": "x-mudraid-",               "reserved": true },
+      { "header": "authorization",            "reserved": false },
+      { "header": "x-correlation-id",         "reserved": false },
+      { "header": "x-mudra-id",               "reserved": false },
+      { "header": "mudraid-agent-id",         "reserved": false },
+      { "header": "content-type",             "reserved": false }
+    ]
+  },
+
+  "decide_response_reading": {
+    "$comment": [
+      "How a /decide response becomes an enforcement outcome. 'error' means",
+      "the adapter could not read a trustworthy answer and must deny-close —",
+      "it is NEVER a quieter kind of allow.",
+      "",
+      "expected_decision_id is the id the adapter sent. decided_at is",
+      "expressed as an offset in seconds from 'now' so the corpus does not",
+      "age: a literal timestamp would pass today and fail in a month."
+    ],
+    "expected_decision_id": "dec-expected",
+    "cases": [
+      {
+        "name": "a bound allow is an allow",
+        "response": { "schema_version": "2.0", "decision_id": "dec-expected", "decision": "allow", "decided_at_offset_seconds": 0 },
+        "outcome": "allow"
+      },
+      {
+        "name": "a bound deny is a deny",
+        "response": { "schema_version": "2.0", "decision_id": "dec-expected", "decision": "deny", "decided_at_offset_seconds": 0 },
+        "outcome": "deny"
+      },
+      {
+        "name": "a bare allow is not an answer",
+        "$why": "five characters anything on the path could have produced",
+        "response": { "decision": "allow" },
+        "outcome": "error"
+      },
+      {
+        "name": "an unsupported response contract is refused",
+        "response": { "schema_version": "9.9", "decision_id": "dec-expected", "decision": "allow", "decided_at_offset_seconds": 0 },
+        "outcome": "error"
+      },
+      {
+        "name": "an absent response contract is refused",
+        "response": { "decision_id": "dec-expected", "decision": "allow", "decided_at_offset_seconds": 0 },
+        "outcome": "error"
+      },
+      {
+        "name": "an allow bound to another request is refused",
+        "$why": "the replay case: a genuine allow, answering someone else's question",
+        "response": { "schema_version": "2.0", "decision_id": "dec-other", "decision": "allow", "decided_at_offset_seconds": 0 },
+        "outcome": "error"
+      },
+      {
+        "name": "an absent decision id is refused",
+        "response": { "schema_version": "2.0", "decision": "allow", "decided_at_offset_seconds": 0 },
+        "outcome": "error"
+      },
+      {
+        "name": "an unrecognised decision word is never optimistically read",
+        "response": { "schema_version": "2.0", "decision_id": "dec-expected", "decision": "maybe", "decided_at_offset_seconds": 0 },
+        "outcome": "error"
+      },
+      {
+        "name": "capitalisation is not the vocabulary",
+        "response": { "schema_version": "2.0", "decision_id": "dec-expected", "decision": "ALLOW", "decided_at_offset_seconds": 0 },
+        "outcome": "error"
+      },
+      {
+        "name": "a stale decision is refused",
+        "$why": "the id is echoed from the request, so replaying a whole exchange pairs a stale allow with a fresh-looking id",
+        "response": { "schema_version": "2.0", "decision_id": "dec-expected", "decision": "allow", "decided_at_offset_seconds": -600 },
+        "outcome": "error"
+      },
+      {
+        "name": "a decision dated in the future is refused",
+        "response": { "schema_version": "2.0", "decision_id": "dec-expected", "decision": "allow", "decided_at_offset_seconds": 600 },
+        "outcome": "error"
+      },
+      {
+        "name": "a decision with no timestamp is refused",
+        "$why": "unbounded age; a captured allow would stay usable forever",
+        "response": { "schema_version": "2.0", "decision_id": "dec-expected", "decision": "allow" },
+        "outcome": "error"
+      },
+      {
+        "name": "a small clock difference is tolerated",
+        "$why": "real clocks disagree; a decision is not the place to discover it",
+        "response": { "schema_version": "2.0", "decision_id": "dec-expected", "decision": "allow", "decided_at_offset_seconds": 10 },
+        "outcome": "allow"
+      }
+    ]
+  }
+}
