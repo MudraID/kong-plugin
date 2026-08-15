@@ -59,6 +59,29 @@ Kong must be restarted (not reloaded) the first time a new plugin is added to
 luarocks make mudraid-enforce-1.1.0-1.rockspec
 ```
 
+## What this plugin protects — read before configuring
+
+> **`mudraid-enforce` protects MCP servers.**
+>
+> MudraID V2 provides live action authorization for MCP Streamable HTTP tool
+> calls. MCP transport and session requests remain subject to the MCP server's
+> normal HTTP/OAuth authentication. For ordinary REST APIs, use MudraID's
+> route/scope middleware, which enforces the configured HTTP method and
+> route—including GET and DELETE.
+
+The plugin's control loop treats `GET`/`HEAD`/`OPTIONS` as Streamable-HTTP
+transport and `DELETE` as MCP session control, and calls `/decide` for neither.
+That is correct for MCP Streamable HTTP and wrong for a REST API, where a `GET`
+reads and a `DELETE` destroys. Putting an ordinary REST route in
+`protected_paths` therefore does not authorize its reads and deletes — it only
+makes them look supervised.
+
+`public_methods` is the same shape of statement: `initialize`, `ping` and
+`tools/list` are MCP control and discovery messages that pass a protected
+surface **without** a decision. They receive no `/decide` verdict, and the
+plugin does not authenticate the MCP transport or session on your server's
+behalf.
+
 ## Configure
 
 **The whole customer configuration is two values.**
@@ -101,7 +124,7 @@ separate one per gateway rather than sharing.
 | `base_url` | — | MudraID origin for this environment. Every endpoint derives from it. |
 | `adapter_token` | — | This instance's bearer. Without it no bundle loads and protected paths fail **closed** (503). |
 | `bundle_signing_secret` | — | HMAC-SHA256 verification secret. Without it every bundle is refused — unsigned trust is never an option. |
-| `protected_paths` | `[]` | Request paths this plugin enforces on. **Empty means the plugin is inert** and all traffic passes through untouched. |
+| `protected_paths` | `[]` | The **MCP Streamable HTTP endpoints** this plugin enforces on — e.g. `/mcp`. Not a general route list: an ordinary REST path here is not correctly enforced (see above). **Empty means the plugin is inert** and all traffic passes through untouched. |
 | `public_methods` | `initialize`, `ping`, `tools/list` | JSON-RPC methods on a protected surface that are control-plane rather than protected actions. |
 | `surface_platform_id` | — | The surface this instance speaks for. Required once a second instance exists on the same gateway. |
 | `poll_interval_seconds` | `30` | Bundle poll cadence (5–3600). |
@@ -116,6 +139,18 @@ tests pointing at a loopback stub. Each **replaces one derived URL** and is
 validated exactly as strictly. Supplying one changes where a request goes,
 never how carefully it is checked.
 
+### If you registered an adapter declaring the `http` protocol mode
+
+`mcp_streamable_http` is now the only protocol mode a V2 enforcement adapter may
+declare. A previously recorded adapter carrying a bare `http` mode is **not**
+silently reinterpreted as MCP — the record described a surface this plugin
+cannot correctly enforce, and reading it as something else would leave a REST
+API's `GET` and `DELETE` unauthorized while the record claimed otherwise. It
+fails validation on its next write, visibly. Either move that surface to the V1
+route/scope middleware and retire the adapter record, or — if it really is MCP
+Streamable HTTP — reclassify it: re-register with `mcp_streamable_http` and set
+`protected_paths` to the MCP endpoints.
+
 ### Path matching is not a lexical prefix
 
 `protected_paths` matches an **exact path plus `/`-separated descendants**.
@@ -126,6 +161,37 @@ never how carefully it is checked.
 
 Every spelling of the request path is tested, so an encoded or dot-segmented
 request cannot slip past.
+
+### Verify the plugin is actually enforcing, not merely installed
+
+Configuring a route is not the same act as enforcing it. `protected_paths` is
+the only thing that designates a surface, and a plugin loaded into Kong but not
+attached to the route your MCP server sits behind will let every request past
+in silence.
+
+Prove it before you rely on it. `POST` the protected path with a body that is
+not JSON-RPC:
+
+```sh
+curl -i -X POST https://your-gateway.example.com/mcp \
+  -H 'Content-Type: application/json' -d 'not-json'
+```
+
+The answer tells you which state you are in:
+
+| Response | What it means |
+| --- | --- |
+| `400` `ENFORCE_MALFORMED_REQUEST` | Enforcing. The plugin is on this route with an active bundle. |
+| `503` `ENFORCE_NO_VALID_BUNDLE` | On the route, but no verified bundle yet — check `adapter_token` and `bundle_signing_secret`. Deny-closed, so nothing is passing. |
+| Your MCP server's own error, or a `200` | **Not enforcing this route.** The plugin is not attached, or `protected_paths` does not cover the path. |
+
+Every denial this plugin authors carries
+`{"error":{"code":"ENFORCE_…","message":…,"correlation_id":…}}`. An error body
+in any other shape came from your upstream, which means the request reached it.
+
+Nothing in the MudraID portal can make this determination for you. The control
+plane records what an adapter *reports* — received, validated, active, observed
+— which is a statement about the adapter, not a measurement of your route.
 
 ## Multiple tenants on one gateway
 
@@ -158,6 +224,10 @@ Stated plainly, because the difference is usually what matters:
 - **Bundles are verified before they are trusted.** Signature and digests are
   checked on every served bundle. On any refusal the last valid bundle is kept
   rather than falling back to none.
+- **It does not authenticate your MCP transport or session.** Tool-action
+  authorization is what this plugin adds. Establishing and authenticating the
+  MCP connection — HTTP/OAuth on your MCP server — stays your server's job, and
+  a surface with no such authentication is not made safe by adding this plugin.
 - **Forwarded once.** Upstream retries are disabled on protected requests.
 - **It does not sign decision responses** in this release, and does not claim
   to. Do not build a trust assumption on a signature that is not there.
