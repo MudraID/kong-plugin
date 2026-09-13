@@ -49,6 +49,7 @@ local ack_mod = require "kong.plugins.mudraid-enforce.ack"
 local channel = require "kong.plugins.mudraid-enforce.channel"
 local tenants = require "kong.plugins.mudraid-enforce.tenants"
 local decide = require "kong.plugins.mudraid-enforce.decide"
+local execution_mod = require "kong.plugins.mudraid-enforce.execution"
 local containment = require "kong.plugins.mudraid-enforce.containment"
 local crypto = require "kong.plugins.mudraid-enforce.crypto"
 local path_mod = require "kong.plugins.mudraid-enforce.path"
@@ -155,6 +156,23 @@ local function refuse(slot, code, detail)
 end
 
 local function poll_bundle(conf, slot)
+  -- A9-02: refresh the DECISION-response verification keys alongside the
+  -- bundle. Never clears a working set — the keys are public, already-fetched
+  -- material, and dropping them because the endpoint blipped would refuse
+  -- every SIGNED decision, turning a transient control-plane outage into an
+  -- enforcement outage. Rotation still takes effect because a successful
+  -- fetch REPLACES the set: a key that stops being published stops being
+  -- trusted at the next successful refresh. (Mirrors the Python middleware's
+  -- _refresh_verification_keys discipline.)
+  local decision_keys, kerr = channel.fetch_verification_keys(conf)
+  if decision_keys then
+    if next(decision_keys) ~= nil then
+      slot.decision_keys = decision_keys
+    end
+  elseif kerr then
+    kong.log.warn("mudraid-enforce: verification keys fetch failed: ", kerr)
+  end
+
   local active = slot.bundle and {
     bundle_version = slot.bundle.bundle_version,
     payload_digest = slot.bundle.payload_digest,
@@ -847,6 +865,24 @@ function MudraidEnforce:access(conf)
   -- checks the authoritative current projection/source"). The local projection
   -- above is a stricter, earlier gate over the targets this adapter can bind;
   -- it never replaces this call, and no allow is returned without it.
+  local execution_digest, execution
+  local decision_path = path
+  if action.argument_profile ~= nil and action.argument_profile ~= cjson.null then
+    decision_path = ngx.var.request_uri
+    local ok, digest, snapshot = pcall(execution_mod.bind, b, action, {
+      body = body, content_type = kong.request.get_header("Content-Type"),
+      authorization = kong.request.get_header("Authorization"),
+      method = method, path = decision_path,
+    }, {
+      crypto = crypto, json = { null = channel.null, array_mt = channel.array_mt },
+      encode_base64 = ngx.encode_base64,
+    })
+    if not ok or not digest then
+      return deny(503, "ENFORCE_DECIDE_UNAVAILABLE",
+        "The request could not be bound to its configured conditions.")
+    end
+    execution_digest, execution = digest, snapshot
+  end
   local decision_id = uuid()
   local outcome, detail = decide.call(conf, {
     schema_version = decide.ENVELOPE_SCHEMA,
@@ -884,9 +920,35 @@ function MudraidEnforce:access(conf)
     request = {
       transport = "mcp_streamable_http",
       http_method = method,
-      path = path,
+      path = decision_path,
     },
+    execution = execution,
     presented_authorization = kong.request.get_header("Authorization"),
+  }, {
+    -- A9-02: response-signature verification context. The decision is
+    -- verified WHEN SIGNED against the published decision key series and the
+    -- bindings this gateway can vouch for — the SIGNED bundle's surface and
+    -- the matched action, never anything taken from the response itself. An
+    -- absent signature is read as before (the authority activates signing by
+    -- rollout) UNLESS the operator has declared signing live on this gateway;
+    -- a present one that fails ANY check refuses the response, which the
+    -- outcome contract below deny-closes.
+    crypto = crypto,
+    json = { null = channel.null, array_mt = channel.array_mt },
+    keys = slot.decision_keys,
+    -- The operator's statement that this surface's decisions are signed now.
+    -- Read straight from config on every request rather than captured at
+    -- configure() time, so flipping it takes effect with a config reload and
+    -- not a restart. OFF leaves the rollout posture exactly as it was.
+    require_signed = conf.require_signed_decisions or execution_digest ~= nil,
+    expected = {
+      platform_id = surface and surface.platform_id or nil,
+      environment = surface and surface.environment or nil,
+      canonical_resource_uri = surface and surface.canonical_resource_uri or nil,
+      action_key = action.action_key,
+      bundle_version = b.bundle_version,
+      execution_request_digest = execution_digest,
+    },
   })
   observe_decision_once(slot)
 

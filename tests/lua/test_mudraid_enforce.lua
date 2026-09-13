@@ -26,6 +26,11 @@ local matcher = require "kong.plugins.mudraid-enforce.matcher"
 local ack = require "kong.plugins.mudraid-enforce.ack"
 local bundle = require "kong.plugins.mudraid-enforce.bundle"
 
+-- Resolve the companion test beside this file in both checkout and image.
+local test_source = debug.getinfo(1, "S").source
+local test_dir = assert(test_source:match("^@(.*/)"), "test script directory unavailable")
+dofile(test_dir .. "test_execution.lua")
+
 local failures, tests = 0, 0
 
 
@@ -689,6 +694,249 @@ if ok_decide then
     '{"schema_version":"2.0","decision_id":"dec-expected","decision":"deny","decided_at":"'
       .. fresh_decided_at() .. '"}')
   eq(o_good, "deny", "a valid, bound deny is read as a deny")
+
+  -- (6) response SIGNATURE handling (A9-02). Structural/binding refusals are
+  -- pure Lua, so a fake verify_rs256 exercises them here; the REAL RS256
+  -- vectors run in test_conformance.lua inside the gateway image, where the
+  -- OpenSSL bindings exist.
+  local function answering_with_opts(body, verify_opts)
+    decide._http = { new = function()
+      return {
+        set_timeout = function() end,
+        request_uri = function() return { status = 200, body = body } end,
+      }
+    end }
+    return decide.call(
+      { base_url = "https://api.example.test", decide_timeout_ms = 1000,
+        adapter_token = "adapter-tok" },
+      { correlation_id = "corr-sig", decision_id = "dec-expected" },
+      verify_opts)
+  end
+
+  local stamp = fresh_decided_at()
+  local function signed_body(sig_json)
+    return '{"schema_version":"2.0","decision_id":"dec-expected","decision":"allow",'
+      .. '"decided_at":"' .. stamp .. '","signature":' .. sig_json .. '}'
+  end
+  local trusting_crypto = { verify_rs256 = function() return true end }
+  local refusing_crypto = { verify_rs256 = function() return false, "bad sig" end }
+  -- The SAME null sentinel decide.lua's decoder produces — handler.lua passes
+  -- channel.null for exactly this reason. A different sentinel would make the
+  -- null-signature cases below vacuous.
+  local ok_cjson, cjson_lib = pcall(require, "cjson.safe")
+  local cjson_null = ok_cjson and cjson_lib.null or nil
+  local function claims_json(overrides)
+    local now = os.time()
+    local c = {
+      profile = '"mudraid.decision.signature/1"',
+      algorithm = '"RS256"',
+      key_id = '"k1"',
+      decision_id = '"dec-expected"',
+      decision = '"allow"',
+      decided_at = '"' .. stamp .. '"',
+      not_before = '"' .. os.date("!%Y-%m-%dT%H:%M:%SZ", now - 10) .. '"',
+      expires_at = '"' .. os.date("!%Y-%m-%dT%H:%M:%SZ", now + 300) .. '"',
+    }
+    for k, v in pairs(overrides or {}) do c[k] = v end
+    local parts = {}
+    for k, v in pairs(c) do parts[#parts + 1] = '"' .. k .. '":' .. v end
+    return "{" .. table.concat(parts, ",") .. "}"
+  end
+  local function sig_json(claims, overrides)
+    local s = {
+      profile = '"mudraid.decision.signature/1"',
+      algorithm = '"RS256"',
+      key_id = '"k1"',
+      claims = claims,
+      signature = '"c2ln"',
+    }
+    for k, v in pairs(overrides or {}) do s[k] = v end
+    local parts = {}
+    for k, v in pairs(s) do parts[#parts + 1] = '"' .. k .. '":' .. v end
+    return "{" .. table.concat(parts, ",") .. "}"
+  end
+  local keys = { k1 = "-----BEGIN PUBLIC KEY-----fake" }
+
+  -- A present signature with NO verification context is refused, never
+  -- optimistically read: an unverifiable signature is not an absent one.
+  local o_noopts, d_noopts = answering_with_opts(signed_body(sig_json(claims_json())), nil)
+  eq(o_noopts, "error", "a signed response with no verify context is refused")
+  eq(d_noopts.reason, "DECIDE_RESPONSE_SIGNATURE_INVALID",
+    "refused as a signature fact, deny-closed")
+
+  -- A present signature with keys and a verifier that accepts → read normally.
+  local o_signed = answering_with_opts(signed_body(sig_json(claims_json())),
+    { crypto = trusting_crypto, keys = keys })
+  eq(o_signed, "allow", "a verifying signature lets the bound allow through")
+
+  local exact_opts = { crypto = trusting_crypto, keys = keys, require_signed = true,
+    expected = { execution_request_digest = string.rep("a", 64) } }
+  local o_exact = answering_with_opts(signed_body(sig_json(claims_json({
+    execution_request_digest = '"' .. string.rep("a", 64) .. '"' }))), exact_opts)
+  eq(o_exact, "allow", "signed exact execution digest allows")
+  local o_wrong_execution = answering_with_opts(signed_body(sig_json(claims_json({
+    execution_request_digest = '"' .. string.rep("b", 64) .. '"' }))), exact_opts)
+  eq(o_wrong_execution, "error", "another signed execution digest refuses")
+  local o_missing_execution = answering_with_opts(signed_body(sig_json(claims_json())), exact_opts)
+  eq(o_missing_execution, "error", "missing signed execution digest refuses")
+
+  -- The verifier refusing the bytes refuses the response whole.
+  local o_badsig = answering_with_opts(signed_body(sig_json(claims_json())),
+    { crypto = refusing_crypto, keys = keys })
+  eq(o_badsig, "error", "a signature the crypto refuses deny-closes the response")
+
+  -- Unknown key (rotation refusal), pinned algorithm, claims/envelope drift
+  -- and foreign-surface binding — each refused on its own fact.
+  local o_unknown = answering_with_opts(signed_body(sig_json(claims_json())),
+    { crypto = trusting_crypto, keys = {} })
+  eq(o_unknown, "error", "a signature naming an unpublished key is refused")
+
+  local o_alg = answering_with_opts(
+    signed_body(sig_json(claims_json(), { algorithm = '"none"' })),
+    { crypto = trusting_crypto, keys = keys })
+  eq(o_alg, "error", "algorithm none is refused on the pinned constant")
+
+  local o_flip = answering_with_opts(
+    signed_body(sig_json(claims_json({ decision = '"deny"' }))),
+    { crypto = trusting_crypto, keys = keys })
+  eq(o_flip, "error", "claims disagreeing with the envelope decision are refused")
+
+  local o_surface = answering_with_opts(
+    signed_body(sig_json(claims_json({ platform_id = '"platform-other"' }))),
+    { crypto = trusting_crypto, keys = keys,
+      expected = { platform_id = "platform-mine" } })
+  eq(o_surface, "error", "a decision bound to another platform is refused")
+
+  local o_expired = answering_with_opts(
+    signed_body(sig_json(claims_json({
+      expires_at = '"2020-01-01T00:00:00Z"',
+      not_before = '"2019-01-01T00:00:00Z"',
+    }))),
+    { crypto = trusting_crypto, keys = keys })
+  eq(o_expired, "error", "an expired signature window is refused")
+
+  -- Absent signature: read exactly as before (verify-when-present), even with
+  -- a verify context wired — activation is the authority's move, not ours.
+  local o_unsigned = answering_with_opts(
+    '{"schema_version":"2.0","decision_id":"dec-expected","decision":"deny","decided_at":"'
+      .. stamp .. '"}',
+    { crypto = trusting_crypto, keys = keys })
+  eq(o_unsigned, "deny", "an unsigned response is still read (verify-when-present)")
+
+  -- (7) MANDATORY SIGNATURE MODE (conf.require_signed_decisions, reaching
+  -- decide.lua as verify_opts.require_signed).
+  --
+  -- The equivalent of the Python middleware's `require_signed_decisions`.
+  -- Verify-when-present is a ROLLOUT posture, not the destination: once the
+  -- authority signs every response for a surface, an UNSIGNED response there
+  -- is a stripped signature, and reading it is the exact hole the signature
+  -- exists to close. The setting is what lets an operator say "signing is
+  -- live here" — it is a config value, never a build-time constant, because
+  -- the two adapters and the fleet reach that point at different moments.
+  --
+  -- It is deliberately ONE branch: the mode decides what an ABSENT signature
+  -- means and nothing else. A PRESENT signature is verified identically in
+  -- both modes, and every failure is deny-closed in both.
+  local unsigned_body =
+    '{"schema_version":"2.0","decision_id":"dec-expected","decision":"allow","decided_at":"'
+    .. stamp .. '"}'
+
+  -- OFF (the default) — unchanged: the unsigned response is still read.
+  local o_off = answering_with_opts(unsigned_body,
+    { crypto = trusting_crypto, keys = keys, require_signed = false })
+  eq(o_off, "allow", "unsigned is accepted while signatures are not required")
+
+  -- Absent is the same as explicitly false: an operator who has never heard
+  -- of the setting gets the rollout posture, not a surprise flag day.
+  local o_absent_conf = answering_with_opts(unsigned_body,
+    { crypto = trusting_crypto, keys = keys })
+  eq(o_absent_conf, "allow", "an unset requirement reads as not required")
+
+  -- ON — an unsigned decision is refused, and refused as its OWN typed fact:
+  -- "no signature at all" is a different operational failure from "a
+  -- signature that did not check out", and an operator chasing a stalled
+  -- rollout needs to tell them apart in the log.
+  local o_on, d_on = answering_with_opts(unsigned_body,
+    { crypto = trusting_crypto, keys = keys, require_signed = true })
+  eq(o_on, "error", "an unsigned decision is refused when signatures are required")
+  eq(d_on.reason, "DECIDE_RESPONSE_SIGNATURE_REQUIRED",
+    "the refusal names the missing signature, not a generic invalid one")
+
+  -- A JSON null signature is ABSENCE, not a present-and-broken signature.
+  -- cjson decodes null to a sentinel, so a mode that only checked `== nil`
+  -- would read `"signature": null` as present and refuse it with the wrong
+  -- reason — or worse, on the OFF path, try to verify it.
+  local o_null_on, d_null_on = answering_with_opts(
+    '{"schema_version":"2.0","decision_id":"dec-expected","decision":"allow","decided_at":"'
+      .. stamp .. '","signature":null}',
+    { crypto = trusting_crypto, keys = keys, require_signed = true,
+      json = { null = cjson_null } })
+  eq(o_null_on, "error", "a null signature is absent, and absent is refused when required")
+  eq(d_null_on.reason, "DECIDE_RESPONSE_SIGNATURE_REQUIRED",
+    "a null signature is refused as missing, not as invalid")
+
+  -- Requiring signatures must not break the case it exists to reach: a
+  -- genuine signature still lets the bound decision through.
+  local o_on_signed = answering_with_opts(signed_body(sig_json(claims_json())),
+    { crypto = trusting_crypto, keys = keys, require_signed = true })
+  eq(o_on_signed, "allow", "a verifying signature is read normally in mandatory mode")
+
+  -- INVALID IN BOTH MODES. The mode governs absence only; a present
+  -- signature that fails is refused whether or not signatures are required,
+  -- and the reason stays the signature-invalid one. Turning the requirement
+  -- OFF must never become a way to get a bad signature accepted.
+  local bad_body = signed_body(sig_json(claims_json()))
+  local o_bad_off, d_bad_off = answering_with_opts(bad_body,
+    { crypto = refusing_crypto, keys = keys, require_signed = false })
+  eq(o_bad_off, "error", "an invalid signature is refused with the requirement off")
+  eq(d_bad_off.reason, "DECIDE_RESPONSE_SIGNATURE_INVALID",
+    "refused as an invalid signature, off")
+  local o_bad_on, d_bad_on = answering_with_opts(bad_body,
+    { crypto = refusing_crypto, keys = keys, require_signed = true })
+  eq(o_bad_on, "error", "an invalid signature is refused with the requirement on")
+  eq(d_bad_on.reason, "DECIDE_RESPONSE_SIGNATURE_INVALID",
+    "refused as an invalid signature, on")
+  -- Unknown key and an expired window are signature facts too, not absence:
+  -- both keep their own refusal in mandatory mode.
+  local o_unknown_on, d_unknown_on = answering_with_opts(
+    signed_body(sig_json(claims_json())),
+    { crypto = trusting_crypto, keys = {}, require_signed = true })
+  eq(o_unknown_on, "error", "an unknown-key signature is refused in mandatory mode")
+  eq(d_unknown_on.reason, "DECIDE_RESPONSE_SIGNATURE_INVALID",
+    "an unknown key is a signature failure, not a missing signature")
+  local o_expired_on, d_expired_on = answering_with_opts(
+    signed_body(sig_json(claims_json({
+      expires_at = '"2020-01-01T00:00:00Z"',
+      not_before = '"2019-01-01T00:00:00Z"',
+    }))),
+    { crypto = trusting_crypto, keys = keys, require_signed = true })
+  eq(o_expired_on, "error", "an expired signature is refused in mandatory mode")
+  eq(d_expired_on.reason, "DECIDE_RESPONSE_SIGNATURE_INVALID",
+    "an expired window is a signature failure, not a missing signature")
+
+  -- THE MODE IS CONFINED TO THE SIGNATURE BRANCH.
+  --
+  -- The Kong plugin has NO V1 mode to leave alone — `mode="v1"` is the Python
+  -- middleware's static route-scope path (middleware.py); this plugin only
+  -- ever speaks V2, and its /decide reader accepts exactly the "2.0" response
+  -- contract. The equivalent claim here is that turning the requirement on
+  -- changes nothing except what an absent signature means: a response that
+  -- was already unreadable stays unreadable FOR ITS ORIGINAL REASON, never
+  -- relabelled as a signature problem.
+  local o_v1ish, d_v1ish = answering_with_opts(
+    '{"schema_version":"1.0","decision_id":"dec-expected","decision":"allow","decided_at":"'
+      .. stamp .. '"}',
+    { crypto = trusting_crypto, keys = keys, require_signed = true })
+  eq(o_v1ish, "error", "a non-2.0 response contract is still refused on the contract")
+  eq(d_v1ish.reason, "DECIDE_RESPONSE_SCHEMA_UNSUPPORTED",
+    "refused on the response contract, not relabelled a signature failure")
+  local o_mis_on, d_mis_on = answering_with_opts(
+    '{"schema_version":"2.0","decision_id":"some-other","decision":"allow","decided_at":"'
+      .. stamp .. '"}',
+    { crypto = trusting_crypto, keys = keys, require_signed = true })
+  eq(o_mis_on, "error", "an unbound response is still refused on the binding")
+  eq(d_mis_on.reason, "DECIDE_RESPONSE_DECISION_ID_MISMATCH",
+    "the binding refusal survives mandatory mode unchanged")
 
   decide._http = nil
 else

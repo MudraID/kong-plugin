@@ -11,13 +11,19 @@
     "to make impossible: a divergence fails a test rather than passing two.",
     "",
     "Cases are grouped by the pure decision each adapter makes. Only pure",
-    "logic lives here — path matching, header classification, response",
+    "logic lives here \u2014 path matching, header classification, response",
     "reading. Anything needing a network or a database belongs in the",
     "integration suites, not in a corpus that must run identically in Lua and",
-    "Python."
+    "Python.",
+    "",
+    "corpus_version moves when a case stops being readable by a runner that",
+    "does not know about a new field, and the Lua runner asserts it. v3 added",
+    "require_signed_decisions to decide_response_signature: a v2 runner would",
+    "read the mandatory-mode case as if the mode were off and report it green",
+    "having asserted the opposite contract, which is precisely the silent",
+    "agreement this file exists to prevent."
   ],
-  "corpus_version": "1",
-
+  "corpus_version": "3",
   "protected_path_matching": {
     "$comment": [
       "A protected path guards a prefix boundary, not a string prefix. '/mcp'",
@@ -29,47 +35,114 @@
       "exactly that shape. Getting it wrong sends unprotected traffic through",
       "an enforcement point that believes it is enforcing."
     ],
-    "configured": ["/mcp"],
+    "configured": [
+      "/mcp"
+    ],
     "cases": [
-      { "path": "/mcp",            "protected": true,  "why": "exact match" },
-      { "path": "/mcp/",           "protected": true,  "why": "trailing slash is the same resource" },
-      { "path": "/mcp/tools",      "protected": true,  "why": "descendant, separated by /" },
-      { "path": "/mcp/a/b/c",      "protected": true,  "why": "deep descendant" },
-      { "path": "/mcpfoo",         "protected": false, "why": "different resource; a prefix compare would accept it" },
-      { "path": "/mcp-evil",       "protected": false, "why": "different resource; hyphen is not a separator" },
-      { "path": "/mcpevil/tools",  "protected": false, "why": "different resource, even with a descendant" },
-      { "path": "/",               "protected": false, "why": "the root is not the protected surface" },
-      { "path": "/other",          "protected": false, "why": "unrelated" },
-      { "path": "/api/mcp",        "protected": false, "why": "the boundary is anchored at the start, not searched for" }
+      {
+        "path": "/mcp",
+        "protected": true,
+        "why": "exact match"
+      },
+      {
+        "path": "/mcp/",
+        "protected": true,
+        "why": "trailing slash is the same resource"
+      },
+      {
+        "path": "/mcp/tools",
+        "protected": true,
+        "why": "descendant, separated by /"
+      },
+      {
+        "path": "/mcp/a/b/c",
+        "protected": true,
+        "why": "deep descendant"
+      },
+      {
+        "path": "/mcpfoo",
+        "protected": false,
+        "why": "different resource; a prefix compare would accept it"
+      },
+      {
+        "path": "/mcp-evil",
+        "protected": false,
+        "why": "different resource; hyphen is not a separator"
+      },
+      {
+        "path": "/mcpevil/tools",
+        "protected": false,
+        "why": "different resource, even with a descendant"
+      },
+      {
+        "path": "/",
+        "protected": false,
+        "why": "the root is not the protected surface"
+      },
+      {
+        "path": "/other",
+        "protected": false,
+        "why": "unrelated"
+      },
+      {
+        "path": "/api/mcp",
+        "protected": false,
+        "why": "the boundary is anchored at the start, not searched for"
+      }
     ]
   },
-
   "reserved_headers": {
     "$comment": [
       "Reserved headers carry MudraID's own context to the upstream. A CALLER",
       "supplying one is attempting to inject authority it was never granted,",
-      "so they are stripped before evaluation — every one of them, regardless",
+      "so they are stripped before evaluation \u2014 every one of them, regardless",
       "of case, because HTTP header names are case-insensitive and an",
       "adapter that only stripped the lowercase spelling would strip nothing",
       "an attacker actually sends."
     ],
     "cases": [
-      { "header": "x-mudraid-agent-id",       "reserved": true },
-      { "header": "X-MudraID-Agent-Id",       "reserved": true },
-      { "header": "X-MUDRAID-ANYTHING",       "reserved": true },
-      { "header": "x-mudraid-",               "reserved": true },
-      { "header": "authorization",            "reserved": false },
-      { "header": "x-correlation-id",         "reserved": false },
-      { "header": "x-mudra-id",               "reserved": false },
-      { "header": "mudraid-agent-id",         "reserved": false },
-      { "header": "content-type",             "reserved": false }
+      {
+        "header": "x-mudraid-agent-id",
+        "reserved": true
+      },
+      {
+        "header": "X-MudraID-Agent-Id",
+        "reserved": true
+      },
+      {
+        "header": "X-MUDRAID-ANYTHING",
+        "reserved": true
+      },
+      {
+        "header": "x-mudraid-",
+        "reserved": true
+      },
+      {
+        "header": "authorization",
+        "reserved": false
+      },
+      {
+        "header": "x-correlation-id",
+        "reserved": false
+      },
+      {
+        "header": "x-mudra-id",
+        "reserved": false
+      },
+      {
+        "header": "mudraid-agent-id",
+        "reserved": false
+      },
+      {
+        "header": "content-type",
+        "reserved": false
+      }
     ]
   },
-
   "decide_response_reading": {
     "$comment": [
       "How a /decide response becomes an enforcement outcome. 'error' means",
-      "the adapter could not read a trustworthy answer and must deny-close —",
+      "the adapter could not read a trustworthy answer and must deny-close \u2014",
       "it is NEVER a quieter kind of allow.",
       "",
       "expected_decision_id is the id the adapter sent. decided_at is",
@@ -80,73 +153,1995 @@
     "cases": [
       {
         "name": "a bound allow is an allow",
-        "response": { "schema_version": "2.0", "decision_id": "dec-expected", "decision": "allow", "decided_at_offset_seconds": 0 },
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "decided_at_offset_seconds": 0
+        },
         "outcome": "allow"
       },
       {
         "name": "a bound deny is a deny",
-        "response": { "schema_version": "2.0", "decision_id": "dec-expected", "decision": "deny", "decided_at_offset_seconds": 0 },
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "deny",
+          "decided_at_offset_seconds": 0
+        },
         "outcome": "deny"
       },
       {
         "name": "a bare allow is not an answer",
         "$why": "five characters anything on the path could have produced",
-        "response": { "decision": "allow" },
+        "response": {
+          "decision": "allow"
+        },
         "outcome": "error"
       },
       {
         "name": "an unsupported response contract is refused",
-        "response": { "schema_version": "9.9", "decision_id": "dec-expected", "decision": "allow", "decided_at_offset_seconds": 0 },
+        "response": {
+          "schema_version": "9.9",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "decided_at_offset_seconds": 0
+        },
         "outcome": "error"
       },
       {
         "name": "an absent response contract is refused",
-        "response": { "decision_id": "dec-expected", "decision": "allow", "decided_at_offset_seconds": 0 },
+        "response": {
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "decided_at_offset_seconds": 0
+        },
         "outcome": "error"
       },
       {
         "name": "an allow bound to another request is refused",
         "$why": "the replay case: a genuine allow, answering someone else's question",
-        "response": { "schema_version": "2.0", "decision_id": "dec-other", "decision": "allow", "decided_at_offset_seconds": 0 },
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-other",
+          "decision": "allow",
+          "decided_at_offset_seconds": 0
+        },
         "outcome": "error"
       },
       {
         "name": "an absent decision id is refused",
-        "response": { "schema_version": "2.0", "decision": "allow", "decided_at_offset_seconds": 0 },
+        "response": {
+          "schema_version": "2.0",
+          "decision": "allow",
+          "decided_at_offset_seconds": 0
+        },
         "outcome": "error"
       },
       {
         "name": "an unrecognised decision word is never optimistically read",
-        "response": { "schema_version": "2.0", "decision_id": "dec-expected", "decision": "maybe", "decided_at_offset_seconds": 0 },
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "maybe",
+          "decided_at_offset_seconds": 0
+        },
         "outcome": "error"
       },
       {
         "name": "capitalisation is not the vocabulary",
-        "response": { "schema_version": "2.0", "decision_id": "dec-expected", "decision": "ALLOW", "decided_at_offset_seconds": 0 },
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "ALLOW",
+          "decided_at_offset_seconds": 0
+        },
         "outcome": "error"
       },
       {
         "name": "a stale decision is refused",
         "$why": "the id is echoed from the request, so replaying a whole exchange pairs a stale allow with a fresh-looking id",
-        "response": { "schema_version": "2.0", "decision_id": "dec-expected", "decision": "allow", "decided_at_offset_seconds": -600 },
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "decided_at_offset_seconds": -600
+        },
         "outcome": "error"
       },
       {
         "name": "a decision dated in the future is refused",
-        "response": { "schema_version": "2.0", "decision_id": "dec-expected", "decision": "allow", "decided_at_offset_seconds": 600 },
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "decided_at_offset_seconds": 600
+        },
         "outcome": "error"
       },
       {
         "name": "a decision with no timestamp is refused",
         "$why": "unbounded age; a captured allow would stay usable forever",
-        "response": { "schema_version": "2.0", "decision_id": "dec-expected", "decision": "allow" },
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow"
+        },
         "outcome": "error"
       },
       {
         "name": "a small clock difference is tolerated",
         "$why": "real clocks disagree; a decision is not the place to discover it",
-        "response": { "schema_version": "2.0", "decision_id": "dec-expected", "decision": "allow", "decided_at_offset_seconds": 10 },
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "decided_at_offset_seconds": 10
+        },
         "outcome": "allow"
+      }
+    ]
+  },
+  "decide_response_signature": {
+    "$comment": [
+      "AUDIT-009 A9-02 \u2014 the /decide RESPONSE signature. Vectors are",
+      "minted by the REAL authority signer",
+      "(services/enforcement-service/app/application/decision_signature.py)",
+      "over an ephemeral RSA key whose PUBLIC half alone is stored below;",
+      "regenerate with scripts/generate_decision_signature_conformance.py.",
+      "",
+      "Both runners inject verification_now as the verification clock, so",
+      "the pre-signed timestamps are deterministic and never age out.",
+      "outcome drives the Python runner (_read_decision, full pipeline).",
+      "",
+      "signature_valid routes the LUA runner, it does not merely filter",
+      "it. true/false cases carry a signature and go to",
+      "decide.verify_signature, the pure verifier, which needs real",
+      "RS256 and therefore runs in the gateway image build. null cases",
+      "carry NO signature, so there is nothing for that verifier to",
+      "check; they go to decide.read_response instead, which is where",
+      "ABSENCE is governed, and which needs no RS256 and so runs",
+      "everywhere.",
+      "",
+      "require_signed_decisions is the operator setting, spelled the way",
+      "BOTH adapters spell it. Absent means false. It is what makes the",
+      "two null cases a pair: one envelope, two modes, opposite",
+      "outcomes. lua_refusal_reason is asserted only by the Lua runner,",
+      "because the Kong adapter gives absence its own reason code while",
+      "the middleware returns an untyped error on both signature paths."
+    ],
+    "expected_decision_id": "dec-expected",
+    "expected": {
+      "platform_id": "platform-conf-1",
+      "environment": "production",
+      "canonical_resource_uri": "https://mcp.example.test/mcp",
+      "action_key": "crm.contacts.export",
+      "bundle_version": 7
+    },
+    "verification_now": "2026-08-20T12:00:00+00:00",
+    "verification_now_epoch": 1787227200,
+    "keys": {
+      "muid_sk_conformance_decision_1": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArgQsQcB4Spo400hnQcMv\ndavrZUB5bCW5EuT0uAEmYpGEgtjR1298X24YeXXRpgN99HrkfgRk7O3SevDvLFoT\nsTATugA42HukSeDCDUbbOwQc8CkKc/IkBtpRkinBhhWHuiaLeVuWPi5MfMO7GC8J\ny1vOi0i4yB/R6Gu0TW2TQIQrTjgaRXfBus+HlPWnaCeUW3zVK6N85soH/0hplU7L\n1Z7VgoECP6wHalrbz2JscZaEc3KR7iyo1cXsIon0QpReuEMckuCCRdEj4w2io8qn\nyxFbe70rC+p7GqoJaN1bnA1aqdJPfttFB+0ZFV1K/2WHW/pgMd2LqFBizqAIzeZg\nSQIDAQAB\n-----END PUBLIC KEY-----\n"
+    },
+    "cases": [
+      {
+        "name": "a genuine signed allow verifies",
+        "why": "the authority's real signer produced it for this surface and action",
+        "signature_valid": true,
+        "outcome": "allow",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "outcome": "allow",
+          "directive": "proceed",
+          "reason": {
+            "primary": "authorized",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "allow",
+              "decision": "allow",
+              "reason_primary": "authorized",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "Oz25x053E6V6JZkCA9DqT0dpZ9kTyDvpA1TCFtvPHSZk8xsnOHVOfeQ3cxvcayVhyhma7sUMKtgmya+GWM++L4MNN7Ri6c/yMNUIAgNjm0wz3yjSYJKiOnLabStR0DDdcWJI3rIU4epg2y+lX0c3WRNth2zX9AFEzRFuNmoEioFMzX9RzDsjdhGz8dtQMmLyqeWnz9MtadSojJJUtELbWth2VTp7Sys4PUB7mM1TCGEhEdU55bT5Nc6YC/0bZeIn+aT5kMgIkVyOO0xiwyd56mwEC6YNYflxaEPPLT7GOxm7e0KWqlr/62NArl4OcNUuXRA9lvMbH3KOj7+7cMxPjA=="
+          }
+        }
+      },
+      {
+        "name": "a genuine signed deny verifies",
+        "why": "deny responses are signed too \u2014 allow-only signing would let a forger flip outcomes below the signature",
+        "signature_valid": true,
+        "outcome": "deny",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "deny",
+          "outcome": "deny",
+          "directive": "block",
+          "reason": {
+            "primary": "scope_not_granted",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "deny",
+              "decision": "deny",
+              "reason_primary": "scope_not_granted",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "qKG2Vwl3wN7idQvaHDLrhEEEVqxAh5s5xH25wiBqMEZShUur3xDWrcJx21rWfDsWYX7u71UPQqK84XGoBq1y+coRCAabNdvrU0BqAnRYqOxfct2jfRmUkQLcwd02o64OZTudWEBfFZ1GjNxZXEKOHj42wV8TKR2iuCA/kYYSM6OGwAb8/YXkRci83frpEzw8hBqpl6VR0D3yyWTjI2D0bPaMf9A3LJFhP/0IOhjhWuI4bR1DaVge2dGR4tERvKhYpH4JYVI3m+glhEHjDN5H+Zc4BrOWrGh0GApm2XWGSxWQOCL6oYTXOJbsimjfxde4WrTW3OQVmu8T3Ft5adB6Iw=="
+          }
+        }
+      },
+      {
+        "name": "claims.decision_id mutated after signing is refused",
+        "why": "the signature covers the canonical claims; any changed bound field must fail RS256 verification",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "deny",
+          "outcome": "deny",
+          "directive": "block",
+          "reason": {
+            "primary": "scope_not_granted",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-other",
+              "outcome": "deny",
+              "decision": "deny",
+              "reason_primary": "scope_not_granted",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "qKG2Vwl3wN7idQvaHDLrhEEEVqxAh5s5xH25wiBqMEZShUur3xDWrcJx21rWfDsWYX7u71UPQqK84XGoBq1y+coRCAabNdvrU0BqAnRYqOxfct2jfRmUkQLcwd02o64OZTudWEBfFZ1GjNxZXEKOHj42wV8TKR2iuCA/kYYSM6OGwAb8/YXkRci83frpEzw8hBqpl6VR0D3yyWTjI2D0bPaMf9A3LJFhP/0IOhjhWuI4bR1DaVge2dGR4tERvKhYpH4JYVI3m+glhEHjDN5H+Zc4BrOWrGh0GApm2XWGSxWQOCL6oYTXOJbsimjfxde4WrTW3OQVmu8T3Ft5adB6Iw=="
+          }
+        }
+      },
+      {
+        "name": "claims.outcome mutated after signing is refused",
+        "why": "the signature covers the canonical claims; any changed bound field must fail RS256 verification",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "deny",
+          "outcome": "deny",
+          "directive": "block",
+          "reason": {
+            "primary": "scope_not_granted",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "allow",
+              "decision": "deny",
+              "reason_primary": "scope_not_granted",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "qKG2Vwl3wN7idQvaHDLrhEEEVqxAh5s5xH25wiBqMEZShUur3xDWrcJx21rWfDsWYX7u71UPQqK84XGoBq1y+coRCAabNdvrU0BqAnRYqOxfct2jfRmUkQLcwd02o64OZTudWEBfFZ1GjNxZXEKOHj42wV8TKR2iuCA/kYYSM6OGwAb8/YXkRci83frpEzw8hBqpl6VR0D3yyWTjI2D0bPaMf9A3LJFhP/0IOhjhWuI4bR1DaVge2dGR4tERvKhYpH4JYVI3m+glhEHjDN5H+Zc4BrOWrGh0GApm2XWGSxWQOCL6oYTXOJbsimjfxde4WrTW3OQVmu8T3Ft5adB6Iw=="
+          }
+        }
+      },
+      {
+        "name": "claims.decision mutated after signing is refused",
+        "why": "the signature covers the canonical claims; any changed bound field must fail RS256 verification",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "deny",
+          "outcome": "deny",
+          "directive": "block",
+          "reason": {
+            "primary": "scope_not_granted",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "deny",
+              "decision": "allow",
+              "reason_primary": "scope_not_granted",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "qKG2Vwl3wN7idQvaHDLrhEEEVqxAh5s5xH25wiBqMEZShUur3xDWrcJx21rWfDsWYX7u71UPQqK84XGoBq1y+coRCAabNdvrU0BqAnRYqOxfct2jfRmUkQLcwd02o64OZTudWEBfFZ1GjNxZXEKOHj42wV8TKR2iuCA/kYYSM6OGwAb8/YXkRci83frpEzw8hBqpl6VR0D3yyWTjI2D0bPaMf9A3LJFhP/0IOhjhWuI4bR1DaVge2dGR4tERvKhYpH4JYVI3m+glhEHjDN5H+Zc4BrOWrGh0GApm2XWGSxWQOCL6oYTXOJbsimjfxde4WrTW3OQVmu8T3Ft5adB6Iw=="
+          }
+        }
+      },
+      {
+        "name": "claims.reason_primary mutated after signing is refused",
+        "why": "the signature covers the canonical claims; any changed bound field must fail RS256 verification",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "deny",
+          "outcome": "deny",
+          "directive": "block",
+          "reason": {
+            "primary": "scope_not_granted",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "deny",
+              "decision": "deny",
+              "reason_primary": "authorized",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "qKG2Vwl3wN7idQvaHDLrhEEEVqxAh5s5xH25wiBqMEZShUur3xDWrcJx21rWfDsWYX7u71UPQqK84XGoBq1y+coRCAabNdvrU0BqAnRYqOxfct2jfRmUkQLcwd02o64OZTudWEBfFZ1GjNxZXEKOHj42wV8TKR2iuCA/kYYSM6OGwAb8/YXkRci83frpEzw8hBqpl6VR0D3yyWTjI2D0bPaMf9A3LJFhP/0IOhjhWuI4bR1DaVge2dGR4tERvKhYpH4JYVI3m+glhEHjDN5H+Zc4BrOWrGh0GApm2XWGSxWQOCL6oYTXOJbsimjfxde4WrTW3OQVmu8T3Ft5adB6Iw=="
+          }
+        }
+      },
+      {
+        "name": "claims.organization_id mutated after signing is refused",
+        "why": "the signature covers the canonical claims; any changed bound field must fail RS256 verification",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "deny",
+          "outcome": "deny",
+          "directive": "block",
+          "reason": {
+            "primary": "scope_not_granted",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "deny",
+              "decision": "deny",
+              "reason_primary": "scope_not_granted",
+              "organization_id": "org-someone-else",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "qKG2Vwl3wN7idQvaHDLrhEEEVqxAh5s5xH25wiBqMEZShUur3xDWrcJx21rWfDsWYX7u71UPQqK84XGoBq1y+coRCAabNdvrU0BqAnRYqOxfct2jfRmUkQLcwd02o64OZTudWEBfFZ1GjNxZXEKOHj42wV8TKR2iuCA/kYYSM6OGwAb8/YXkRci83frpEzw8hBqpl6VR0D3yyWTjI2D0bPaMf9A3LJFhP/0IOhjhWuI4bR1DaVge2dGR4tERvKhYpH4JYVI3m+glhEHjDN5H+Zc4BrOWrGh0GApm2XWGSxWQOCL6oYTXOJbsimjfxde4WrTW3OQVmu8T3Ft5adB6Iw=="
+          }
+        }
+      },
+      {
+        "name": "claims.environment mutated after signing is refused",
+        "why": "the signature covers the canonical claims; any changed bound field must fail RS256 verification",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "deny",
+          "outcome": "deny",
+          "directive": "block",
+          "reason": {
+            "primary": "scope_not_granted",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "deny",
+              "decision": "deny",
+              "reason_primary": "scope_not_granted",
+              "organization_id": "org-conf-1",
+              "environment": "staging",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "qKG2Vwl3wN7idQvaHDLrhEEEVqxAh5s5xH25wiBqMEZShUur3xDWrcJx21rWfDsWYX7u71UPQqK84XGoBq1y+coRCAabNdvrU0BqAnRYqOxfct2jfRmUkQLcwd02o64OZTudWEBfFZ1GjNxZXEKOHj42wV8TKR2iuCA/kYYSM6OGwAb8/YXkRci83frpEzw8hBqpl6VR0D3yyWTjI2D0bPaMf9A3LJFhP/0IOhjhWuI4bR1DaVge2dGR4tERvKhYpH4JYVI3m+glhEHjDN5H+Zc4BrOWrGh0GApm2XWGSxWQOCL6oYTXOJbsimjfxde4WrTW3OQVmu8T3Ft5adB6Iw=="
+          }
+        }
+      },
+      {
+        "name": "claims.platform_id mutated after signing is refused",
+        "why": "the signature covers the canonical claims; any changed bound field must fail RS256 verification",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "deny",
+          "outcome": "deny",
+          "directive": "block",
+          "reason": {
+            "primary": "scope_not_granted",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "deny",
+              "decision": "deny",
+              "reason_primary": "scope_not_granted",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-other",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "qKG2Vwl3wN7idQvaHDLrhEEEVqxAh5s5xH25wiBqMEZShUur3xDWrcJx21rWfDsWYX7u71UPQqK84XGoBq1y+coRCAabNdvrU0BqAnRYqOxfct2jfRmUkQLcwd02o64OZTudWEBfFZ1GjNxZXEKOHj42wV8TKR2iuCA/kYYSM6OGwAb8/YXkRci83frpEzw8hBqpl6VR0D3yyWTjI2D0bPaMf9A3LJFhP/0IOhjhWuI4bR1DaVge2dGR4tERvKhYpH4JYVI3m+glhEHjDN5H+Zc4BrOWrGh0GApm2XWGSxWQOCL6oYTXOJbsimjfxde4WrTW3OQVmu8T3Ft5adB6Iw=="
+          }
+        }
+      },
+      {
+        "name": "claims.agent_id mutated after signing is refused",
+        "why": "the signature covers the canonical claims; any changed bound field must fail RS256 verification",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "deny",
+          "outcome": "deny",
+          "directive": "block",
+          "reason": {
+            "primary": "scope_not_granted",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "deny",
+              "decision": "deny",
+              "reason_primary": "scope_not_granted",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-other",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "qKG2Vwl3wN7idQvaHDLrhEEEVqxAh5s5xH25wiBqMEZShUur3xDWrcJx21rWfDsWYX7u71UPQqK84XGoBq1y+coRCAabNdvrU0BqAnRYqOxfct2jfRmUkQLcwd02o64OZTudWEBfFZ1GjNxZXEKOHj42wV8TKR2iuCA/kYYSM6OGwAb8/YXkRci83frpEzw8hBqpl6VR0D3yyWTjI2D0bPaMf9A3LJFhP/0IOhjhWuI4bR1DaVge2dGR4tERvKhYpH4JYVI3m+glhEHjDN5H+Zc4BrOWrGh0GApm2XWGSxWQOCL6oYTXOJbsimjfxde4WrTW3OQVmu8T3Ft5adB6Iw=="
+          }
+        }
+      },
+      {
+        "name": "claims.subject mutated after signing is refused",
+        "why": "the signature covers the canonical claims; any changed bound field must fail RS256 verification",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "deny",
+          "outcome": "deny",
+          "directive": "block",
+          "reason": {
+            "primary": "scope_not_granted",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "deny",
+              "decision": "deny",
+              "reason_primary": "scope_not_granted",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-other",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "qKG2Vwl3wN7idQvaHDLrhEEEVqxAh5s5xH25wiBqMEZShUur3xDWrcJx21rWfDsWYX7u71UPQqK84XGoBq1y+coRCAabNdvrU0BqAnRYqOxfct2jfRmUkQLcwd02o64OZTudWEBfFZ1GjNxZXEKOHj42wV8TKR2iuCA/kYYSM6OGwAb8/YXkRci83frpEzw8hBqpl6VR0D3yyWTjI2D0bPaMf9A3LJFhP/0IOhjhWuI4bR1DaVge2dGR4tERvKhYpH4JYVI3m+glhEHjDN5H+Zc4BrOWrGh0GApm2XWGSxWQOCL6oYTXOJbsimjfxde4WrTW3OQVmu8T3Ft5adB6Iw=="
+          }
+        }
+      },
+      {
+        "name": "claims.action_key mutated after signing is refused",
+        "why": "the signature covers the canonical claims; any changed bound field must fail RS256 verification",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "deny",
+          "outcome": "deny",
+          "directive": "block",
+          "reason": {
+            "primary": "scope_not_granted",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "deny",
+              "decision": "deny",
+              "reason_primary": "scope_not_granted",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.delete",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "qKG2Vwl3wN7idQvaHDLrhEEEVqxAh5s5xH25wiBqMEZShUur3xDWrcJx21rWfDsWYX7u71UPQqK84XGoBq1y+coRCAabNdvrU0BqAnRYqOxfct2jfRmUkQLcwd02o64OZTudWEBfFZ1GjNxZXEKOHj42wV8TKR2iuCA/kYYSM6OGwAb8/YXkRci83frpEzw8hBqpl6VR0D3yyWTjI2D0bPaMf9A3LJFhP/0IOhjhWuI4bR1DaVge2dGR4tERvKhYpH4JYVI3m+glhEHjDN5H+Zc4BrOWrGh0GApm2XWGSxWQOCL6oYTXOJbsimjfxde4WrTW3OQVmu8T3Ft5adB6Iw=="
+          }
+        }
+      },
+      {
+        "name": "claims.resource mutated after signing is refused",
+        "why": "the signature covers the canonical claims; any changed bound field must fail RS256 verification",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "deny",
+          "outcome": "deny",
+          "directive": "block",
+          "reason": {
+            "primary": "scope_not_granted",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "deny",
+              "decision": "deny",
+              "reason_primary": "scope_not_granted",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/other",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "qKG2Vwl3wN7idQvaHDLrhEEEVqxAh5s5xH25wiBqMEZShUur3xDWrcJx21rWfDsWYX7u71UPQqK84XGoBq1y+coRCAabNdvrU0BqAnRYqOxfct2jfRmUkQLcwd02o64OZTudWEBfFZ1GjNxZXEKOHj42wV8TKR2iuCA/kYYSM6OGwAb8/YXkRci83frpEzw8hBqpl6VR0D3yyWTjI2D0bPaMf9A3LJFhP/0IOhjhWuI4bR1DaVge2dGR4tERvKhYpH4JYVI3m+glhEHjDN5H+Zc4BrOWrGh0GApm2XWGSxWQOCL6oYTXOJbsimjfxde4WrTW3OQVmu8T3Ft5adB6Iw=="
+          }
+        }
+      },
+      {
+        "name": "claims.bundle_version mutated after signing is refused",
+        "why": "the signature covers the canonical claims; any changed bound field must fail RS256 verification",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "deny",
+          "outcome": "deny",
+          "directive": "block",
+          "reason": {
+            "primary": "scope_not_granted",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "deny",
+              "decision": "deny",
+              "reason_primary": "scope_not_granted",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 6,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "qKG2Vwl3wN7idQvaHDLrhEEEVqxAh5s5xH25wiBqMEZShUur3xDWrcJx21rWfDsWYX7u71UPQqK84XGoBq1y+coRCAabNdvrU0BqAnRYqOxfct2jfRmUkQLcwd02o64OZTudWEBfFZ1GjNxZXEKOHj42wV8TKR2iuCA/kYYSM6OGwAb8/YXkRci83frpEzw8hBqpl6VR0D3yyWTjI2D0bPaMf9A3LJFhP/0IOhjhWuI4bR1DaVge2dGR4tERvKhYpH4JYVI3m+glhEHjDN5H+Zc4BrOWrGh0GApm2XWGSxWQOCL6oYTXOJbsimjfxde4WrTW3OQVmu8T3Ft5adB6Iw=="
+          }
+        }
+      },
+      {
+        "name": "claims.policy_version mutated after signing is refused",
+        "why": "the signature covers the canonical claims; any changed bound field must fail RS256 verification",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "deny",
+          "outcome": "deny",
+          "directive": "block",
+          "reason": {
+            "primary": "scope_not_granted",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "deny",
+              "decision": "deny",
+              "reason_primary": "scope_not_granted",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 4,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "qKG2Vwl3wN7idQvaHDLrhEEEVqxAh5s5xH25wiBqMEZShUur3xDWrcJx21rWfDsWYX7u71UPQqK84XGoBq1y+coRCAabNdvrU0BqAnRYqOxfct2jfRmUkQLcwd02o64OZTudWEBfFZ1GjNxZXEKOHj42wV8TKR2iuCA/kYYSM6OGwAb8/YXkRci83frpEzw8hBqpl6VR0D3yyWTjI2D0bPaMf9A3LJFhP/0IOhjhWuI4bR1DaVge2dGR4tERvKhYpH4JYVI3m+glhEHjDN5H+Zc4BrOWrGh0GApm2XWGSxWQOCL6oYTXOJbsimjfxde4WrTW3OQVmu8T3Ft5adB6Iw=="
+          }
+        }
+      },
+      {
+        "name": "claims.decided_at mutated after signing is refused",
+        "why": "the signature covers the canonical claims; any changed bound field must fail RS256 verification",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "deny",
+          "outcome": "deny",
+          "directive": "block",
+          "reason": {
+            "primary": "scope_not_granted",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "deny",
+              "decision": "deny",
+              "reason_primary": "scope_not_granted",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:45+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "qKG2Vwl3wN7idQvaHDLrhEEEVqxAh5s5xH25wiBqMEZShUur3xDWrcJx21rWfDsWYX7u71UPQqK84XGoBq1y+coRCAabNdvrU0BqAnRYqOxfct2jfRmUkQLcwd02o64OZTudWEBfFZ1GjNxZXEKOHj42wV8TKR2iuCA/kYYSM6OGwAb8/YXkRci83frpEzw8hBqpl6VR0D3yyWTjI2D0bPaMf9A3LJFhP/0IOhjhWuI4bR1DaVge2dGR4tERvKhYpH4JYVI3m+glhEHjDN5H+Zc4BrOWrGh0GApm2XWGSxWQOCL6oYTXOJbsimjfxde4WrTW3OQVmu8T3Ft5adB6Iw=="
+          }
+        }
+      },
+      {
+        "name": "claims.deadline_at mutated after signing is refused",
+        "why": "the signature covers the canonical claims; any changed bound field must fail RS256 verification",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "deny",
+          "outcome": "deny",
+          "directive": "block",
+          "reason": {
+            "primary": "scope_not_granted",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "deny",
+              "decision": "deny",
+              "reason_primary": "scope_not_granted",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T12:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "qKG2Vwl3wN7idQvaHDLrhEEEVqxAh5s5xH25wiBqMEZShUur3xDWrcJx21rWfDsWYX7u71UPQqK84XGoBq1y+coRCAabNdvrU0BqAnRYqOxfct2jfRmUkQLcwd02o64OZTudWEBfFZ1GjNxZXEKOHj42wV8TKR2iuCA/kYYSM6OGwAb8/YXkRci83frpEzw8hBqpl6VR0D3yyWTjI2D0bPaMf9A3LJFhP/0IOhjhWuI4bR1DaVge2dGR4tERvKhYpH4JYVI3m+glhEHjDN5H+Zc4BrOWrGh0GApm2XWGSxWQOCL6oYTXOJbsimjfxde4WrTW3OQVmu8T3Ft5adB6Iw=="
+          }
+        }
+      },
+      {
+        "name": "claims.expires_at mutated after signing is refused",
+        "why": "the signature covers the canonical claims; any changed bound field must fail RS256 verification",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "deny",
+          "outcome": "deny",
+          "directive": "block",
+          "reason": {
+            "primary": "scope_not_granted",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "deny",
+              "decision": "deny",
+              "reason_primary": "scope_not_granted",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2027-08-20T12:00:00+00:00"
+            },
+            "signature": "qKG2Vwl3wN7idQvaHDLrhEEEVqxAh5s5xH25wiBqMEZShUur3xDWrcJx21rWfDsWYX7u71UPQqK84XGoBq1y+coRCAabNdvrU0BqAnRYqOxfct2jfRmUkQLcwd02o64OZTudWEBfFZ1GjNxZXEKOHj42wV8TKR2iuCA/kYYSM6OGwAb8/YXkRci83frpEzw8hBqpl6VR0D3yyWTjI2D0bPaMf9A3LJFhP/0IOhjhWuI4bR1DaVge2dGR4tERvKhYpH4JYVI3m+glhEHjDN5H+Zc4BrOWrGh0GApm2XWGSxWQOCL6oYTXOJbsimjfxde4WrTW3OQVmu8T3Ft5adB6Iw=="
+          }
+        }
+      },
+      {
+        "name": "an envelope flipped to allow under an intact deny signature is refused",
+        "why": "THE forgery this signature exists for: the unsigned envelope copy of every signed field must agree with the claims byte-for-byte",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "outcome": "allow",
+          "directive": "block",
+          "reason": {
+            "primary": "scope_not_granted",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "deny",
+              "decision": "deny",
+              "reason_primary": "scope_not_granted",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "qKG2Vwl3wN7idQvaHDLrhEEEVqxAh5s5xH25wiBqMEZShUur3xDWrcJx21rWfDsWYX7u71UPQqK84XGoBq1y+coRCAabNdvrU0BqAnRYqOxfct2jfRmUkQLcwd02o64OZTudWEBfFZ1GjNxZXEKOHj42wV8TKR2iuCA/kYYSM6OGwAb8/YXkRci83frpEzw8hBqpl6VR0D3yyWTjI2D0bPaMf9A3LJFhP/0IOhjhWuI4bR1DaVge2dGR4tERvKhYpH4JYVI3m+glhEHjDN5H+Zc4BrOWrGh0GApm2XWGSxWQOCL6oYTXOJbsimjfxde4WrTW3OQVmu8T3Ft5adB6Iw=="
+          }
+        }
+      },
+      {
+        "name": "an envelope with a rewritten reason under an intact signature is refused",
+        "why": "the stable reason code is a bound field; rewriting the envelope copy alone is a checkable mismatch",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "deny",
+          "outcome": "deny",
+          "directive": "block",
+          "reason": {
+            "primary": "authorized",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "deny",
+              "decision": "deny",
+              "reason_primary": "scope_not_granted",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "qKG2Vwl3wN7idQvaHDLrhEEEVqxAh5s5xH25wiBqMEZShUur3xDWrcJx21rWfDsWYX7u71UPQqK84XGoBq1y+coRCAabNdvrU0BqAnRYqOxfct2jfRmUkQLcwd02o64OZTudWEBfFZ1GjNxZXEKOHj42wV8TKR2iuCA/kYYSM6OGwAb8/YXkRci83frpEzw8hBqpl6VR0D3yyWTjI2D0bPaMf9A3LJFhP/0IOhjhWuI4bR1DaVge2dGR4tERvKhYpH4JYVI3m+glhEHjDN5H+Zc4BrOWrGh0GApm2XWGSxWQOCL6oYTXOJbsimjfxde4WrTW3OQVmu8T3Ft5adB6Iw=="
+          }
+        }
+      },
+      {
+        "name": "another decision's genuine signature replayed onto this envelope is refused",
+        "why": "replay across decisions: the signed claims name dec-other, the envelope names dec-expected",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "outcome": "allow",
+          "directive": "proceed",
+          "reason": {
+            "primary": "authorized",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-other",
+              "outcome": "allow",
+              "decision": "allow",
+              "reason_primary": "authorized",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "Qi8mJQ6wP/r3ioglfZ0IXBXUzFV6VC3bQ6cx0wtIM7DB0TWiHFj03VDjJDxKrMrH2a/1KJ6uOKi7VS3a6FPqulZanbIJ6LHjbNuT7CCyPGJgsnrP8fS5Hmc9J1ANNRT/o5CcWjHbTyP30JSXVFg5W6gRc1m5YI128WVI3ZP7lir1DyyY+UYWAOhqp5bD90AYT61LxJ1mIVCrKPa7SxCq39uWpT1/P3qtJ21JGwq8ledwtZsxYDAIzxRNA3a2FmJrIDYmWKca1r6ju6wT9ez97efdUBCIhqcWS0B2aLE+hjI81Zk+S7FlKR0o0ByYLLzz5xoWloPyJMVbL+sYwJ3IRg=="
+          }
+        }
+      },
+      {
+        "name": "a signature naming an unpublished (retired) key is refused",
+        "why": "rotation refusal: a key that is no longer published is a key whose signatures are no longer trusted",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "outcome": "allow",
+          "directive": "proceed",
+          "reason": {
+            "primary": "authorized",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_retired",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_retired",
+              "decision_id": "dec-expected",
+              "outcome": "allow",
+              "decision": "allow",
+              "reason_primary": "authorized",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "Oz25x053E6V6JZkCA9DqT0dpZ9kTyDvpA1TCFtvPHSZk8xsnOHVOfeQ3cxvcayVhyhma7sUMKtgmya+GWM++L4MNN7Ri6c/yMNUIAgNjm0wz3yjSYJKiOnLabStR0DDdcWJI3rIU4epg2y+lX0c3WRNth2zX9AFEzRFuNmoEioFMzX9RzDsjdhGz8dtQMmLyqeWnz9MtadSojJJUtELbWth2VTp7Sys4PUB7mM1TCGEhEdU55bT5Nc6YC/0bZeIn+aT5kMgIkVyOO0xiwyd56mwEC6YNYflxaEPPLT7GOxm7e0KWqlr/62NArl4OcNUuXRA9lvMbH3KOj7+7cMxPjA=="
+          }
+        }
+      },
+      {
+        "name": "a signature produced with a different private key is refused",
+        "why": "the claims name the published key id but the bytes were signed by someone else's key",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "outcome": "allow",
+          "directive": "proceed",
+          "reason": {
+            "primary": "authorized",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "allow",
+              "decision": "allow",
+              "reason_primary": "authorized",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "GBW72d4IbyX7fnqQRfRPurtxOS0NBUrgoVCJZ6uMdmDJ2Rnb05Pz1xvMYTMFaWYGTw9fJ6HvdUnLhbEuc1oN2Eki7wnn3s5EwjF+RJMxCRVZkp33Xk/egbaQewZS7hFlCkuBspmU/l5CNwZzL6wXQKYj434A+KSZGBkXVTbQXjZBmcMfYpkSw2M0CRfBjalSGSDlr6kOh8iTifYcFw92KzwwDpwK6zS2X/kSp4E2dxFLncBJWAwJhnV0PrWIbIrK3y1GSYOTurMLNs/83f8nLSlvmz8reRZUxO3NN3+teG12Rx3otl5kbUeRsb8pmarokmlgY79TzwRn6AuANPqQLw=="
+          }
+        }
+      },
+      {
+        "name": "claims naming a different key than the signature is refused",
+        "why": "a verifier resolves the key from the signature; claims that name another are unverifiable by construction",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "outcome": "allow",
+          "directive": "proceed",
+          "reason": {
+            "primary": "authorized",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_other",
+              "decision_id": "dec-expected",
+              "outcome": "allow",
+              "decision": "allow",
+              "reason_primary": "authorized",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "Oz25x053E6V6JZkCA9DqT0dpZ9kTyDvpA1TCFtvPHSZk8xsnOHVOfeQ3cxvcayVhyhma7sUMKtgmya+GWM++L4MNN7Ri6c/yMNUIAgNjm0wz3yjSYJKiOnLabStR0DDdcWJI3rIU4epg2y+lX0c3WRNth2zX9AFEzRFuNmoEioFMzX9RzDsjdhGz8dtQMmLyqeWnz9MtadSojJJUtELbWth2VTp7Sys4PUB7mM1TCGEhEdU55bT5Nc6YC/0bZeIn+aT5kMgIkVyOO0xiwyd56mwEC6YNYflxaEPPLT7GOxm7e0KWqlr/62NArl4OcNUuXRA9lvMbH3KOj7+7cMxPjA=="
+          }
+        }
+      },
+      {
+        "name": "algorithm 'none' is refused on the pinned constant",
+        "why": "the algorithm is compared against the pinned RS256, never read out of the signature and used",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "outcome": "allow",
+          "directive": "proceed",
+          "reason": {
+            "primary": "authorized",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "none",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "allow",
+              "decision": "allow",
+              "reason_primary": "authorized",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "Oz25x053E6V6JZkCA9DqT0dpZ9kTyDvpA1TCFtvPHSZk8xsnOHVOfeQ3cxvcayVhyhma7sUMKtgmya+GWM++L4MNN7Ri6c/yMNUIAgNjm0wz3yjSYJKiOnLabStR0DDdcWJI3rIU4epg2y+lX0c3WRNth2zX9AFEzRFuNmoEioFMzX9RzDsjdhGz8dtQMmLyqeWnz9MtadSojJJUtELbWth2VTp7Sys4PUB7mM1TCGEhEdU55bT5Nc6YC/0bZeIn+aT5kMgIkVyOO0xiwyd56mwEC6YNYflxaEPPLT7GOxm7e0KWqlr/62NArl4OcNUuXRA9lvMbH3KOj7+7cMxPjA=="
+          }
+        }
+      },
+      {
+        "name": "an unsupported signature profile is refused",
+        "why": "a profile this verifier does not implement is one whose fields it cannot read; reading them anyway is how an allow gets believed",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "outcome": "allow",
+          "directive": "proceed",
+          "reason": {
+            "primary": "authorized",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/999",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "allow",
+              "decision": "allow",
+              "reason_primary": "authorized",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "Oz25x053E6V6JZkCA9DqT0dpZ9kTyDvpA1TCFtvPHSZk8xsnOHVOfeQ3cxvcayVhyhma7sUMKtgmya+GWM++L4MNN7Ri6c/yMNUIAgNjm0wz3yjSYJKiOnLabStR0DDdcWJI3rIU4epg2y+lX0c3WRNth2zX9AFEzRFuNmoEioFMzX9RzDsjdhGz8dtQMmLyqeWnz9MtadSojJJUtELbWth2VTp7Sys4PUB7mM1TCGEhEdU55bT5Nc6YC/0bZeIn+aT5kMgIkVyOO0xiwyd56mwEC6YNYflxaEPPLT7GOxm7e0KWqlr/62NArl4OcNUuXRA9lvMbH3KOj7+7cMxPjA=="
+          }
+        }
+      },
+      {
+        "name": "a signature that is not valid base64 is refused",
+        "why": "malformed signature material is a refusal, never skipped",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "outcome": "allow",
+          "directive": "proceed",
+          "reason": {
+            "primary": "authorized",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "allow",
+              "decision": "allow",
+              "reason_primary": "authorized",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "%%not-base64%%"
+          }
+        }
+      },
+      {
+        "name": "a signature past its expires_at is refused",
+        "why": "a captured signed allow must stop working; the window is the backstop behind the decided_at freshness bound",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "outcome": "allow",
+          "directive": "proceed",
+          "reason": {
+            "primary": "authorized",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "allow",
+              "decision": "allow",
+              "reason_primary": "authorized",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T10:00:00+00:00",
+              "expires_at": "2026-08-20T11:00:00+00:00"
+            },
+            "signature": "TbEpPloNRzHBCXS/LOWFqv1cXJsWqzaM0SzjpELX7YK56i3BE1+BfrDW6K7RI8TKrww4GONW/CiuUW6lJtW8TiyOEZDw/AB1HaPNis3G3JJE2omR9y2PfVHKXb7XalxpwRfU1gLIo5q8p6ps4exD+yT4pOuqDsi45T6J3QNh5LjIs+Ug2G22LIipmdNmZQ1/mlClpIpnsmgV/n3wfomlITpa5VrarTrE7OpE/ULti38k2qWTUHQb6ajTLLuFQMRVaoBBFFkcfn+CQYxl6G69GGRQ75q/pl4ZzmHni9ogYc+fr2R05/5H124LytGdYifyBBj1EDccEsAfPONH+NL5wg=="
+          }
+        }
+      },
+      {
+        "name": "a signature not yet valid is refused",
+        "why": "a not_before in the future means a clock somewhere is wrong by more than the tolerated skew; refusing beats guessing",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "outcome": "allow",
+          "directive": "proceed",
+          "reason": {
+            "primary": "authorized",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "allow",
+              "decision": "allow",
+              "reason_primary": "authorized",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T13:00:00+00:00",
+              "expires_at": "2026-08-20T14:00:00+00:00"
+            },
+            "signature": "M2f2mfXpTn+Yi6FwkAeRUpnSik/fP/mIoSn6YI8TzrxGRx5f694pdKfB1HOrSM96bnVrHNK+VbNSjZJiyDtI5iU0pSckGoX7tSSAvxnKvz+nzH0Mac/EAptcslGUN7OA8NQcqnzdWUIU2Qwk7rZfjiBOuGR8dkUWxIk4lZdgEQh45khuVwXSx5380syCad3v9DbdH2NNh/HfG/6YLFIpWqnnB2CcpnK6ZcPgifnaIbqmqgBG8XwfFBQA6h8/xQ9c1pYJRodoaU2BrvXzm3HWAui6Q+YT+U9Dig7WkjwbwYRC5qen0Ux7R44hLJpxgWYdSxlBaRjAvI8JwdWLSsJlrQ=="
+          }
+        }
+      },
+      {
+        "name": "a genuine signature bound to another platform is refused",
+        "why": "the signature verifies \u2014 MudraID really signed it \u2014 but it describes someone else's surface/request, which is a system failing at its own job if accepted",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "outcome": "allow",
+          "directive": "proceed",
+          "reason": {
+            "primary": "authorized",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "allow",
+              "decision": "allow",
+              "reason_primary": "authorized",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-other",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "AbfouVm8GvgwgY7IxrMw/FXqxZMgRT8JwegLcEt5JfWaH4MQ9GnQAEdG9jP+MZ38LXwUv+Se36ET60SUW3h4u/ISb22AZ+u0G6Mrr18I14J75IciMgEkiSwkNScM8x1zUXKnw/2fYhuvWb314uVfYxP9Sb/PmOj01WUpEkQ+GqIEz+0umbMmHGBEsw/OzjqP1UOSBXX/sU/6emb33hbYz+6LU7vs14C36t+mLvSUjmLRH7ZtLbFmic8087ip3MXvoD+V55tISTgs4bHlYvG+V3IWP2URkD632W2YAbfwM9vAs6G08xhdgnHcjBtzPPAZD9K5mX6GauiCvQ8wa3KMRQ=="
+          }
+        }
+      },
+      {
+        "name": "a genuine signature bound to another environment is refused",
+        "why": "the signature verifies \u2014 MudraID really signed it \u2014 but it describes someone else's surface/request, which is a system failing at its own job if accepted",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "outcome": "allow",
+          "directive": "proceed",
+          "reason": {
+            "primary": "authorized",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "allow",
+              "decision": "allow",
+              "reason_primary": "authorized",
+              "organization_id": "org-conf-1",
+              "environment": "staging",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "c4GHHJqqI3gwPru1/vivbpID6srsAEbmITSb+q5RouReqpxuYX8x92RWzGSsAQJTd0XqS4lGhJ0ECZQJW/h89EId3432dHiU5EQsRjjjP+ArqsBoREUgnSYDl3yzAxx0U1i1I8quNUY3+bZ41h+v1S0wR5BJMgogtPgrH09AhkHKjaxekSdUX5+D9ljYXG1RtfuNvrFo1hjHD1OSUsJUPB5I7MX8Swv7BEH2YbANvgXZy1Fh9jucpjDyus9D7fl11JkP6DRNZKvHYLVtYSYHYVJ7tYmVBz3FemeNKGe+UquiOyhW94X5cneM1iYQKnMg4MFnjCbRgXEsRQJZxe9sLg=="
+          }
+        }
+      },
+      {
+        "name": "a genuine signature bound to another resource is refused",
+        "why": "the signature verifies \u2014 MudraID really signed it \u2014 but it describes someone else's surface/request, which is a system failing at its own job if accepted",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "outcome": "allow",
+          "directive": "proceed",
+          "reason": {
+            "primary": "authorized",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "allow",
+              "decision": "allow",
+              "reason_primary": "authorized",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/other",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "lx8Zp/UIrS4fCG09UlturPav2ecsYIxBzdLlK0XvicQcDKEwkicQsG3bbepQm0zsTOVdOpiXtzV20HnJqjBOby2X0jDCNzeW0QZBUNBGuKLF3dp87A9rWvPMZLgr9HIjtQkP5CzlBAPkUGQoJmss7RK4oIuIL+P91tQbqUgaD3nAKRGJBsrPCdFdizGTxhVtD5vPpln1Y5aAoE6IaZ2XAcIwJJZr/vcn3qYS6cSbk30+VNtVlpbZ6Kv8nOdjoq8uiHpRvXf7hybK34D5SABZ24Eu0qXZHIiJymrQfRpvSViIq4XJPwY9LRS4tAFYS0mSEn4ZQuI5ATX2S/y7Nyz8dA=="
+          }
+        }
+      },
+      {
+        "name": "a genuine signature bound to another action is refused",
+        "why": "the signature verifies \u2014 MudraID really signed it \u2014 but it describes someone else's surface/request, which is a system failing at its own job if accepted",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "outcome": "allow",
+          "directive": "proceed",
+          "reason": {
+            "primary": "authorized",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "allow",
+              "decision": "allow",
+              "reason_primary": "authorized",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.delete",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 7,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "fe4NzesZ6dlCChqq4K3NxtPna0p/cUPbdeghFZrvTdCoUnVNgbL7aGd0+8XqdgRSNlWmPEBMIgSOlPiplfMcTExNzQNUgPMXpnFfK3EPaqsYAxrwSyAKYEl9cyq5LxDTl0XXqY/owCBDAnSq/iEXxBj2NUUZtH6OG4hzXft6r/ybyTpu+HJfoQSnr8efs7SnEyt8DcUz+ANZmFlx/1q60ux+mz3buOxVs33mmCycz+ZnB45FdsX/BrrVuZcmLNWvNhnmXeOBgpjW7W9Z9cKW7fXhlAepgykLnExAmsa9PJrEFbl2UNu0a3WGB6Ft6PTxMUrGLjzr8owQivdSLbWoDQ=="
+          }
+        }
+      },
+      {
+        "name": "a genuine signature bound to another bundle version is refused",
+        "why": "the signature verifies \u2014 MudraID really signed it \u2014 but it describes someone else's surface/request, which is a system failing at its own job if accepted",
+        "signature_valid": false,
+        "outcome": "error",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "outcome": "allow",
+          "directive": "proceed",
+          "reason": {
+            "primary": "authorized",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false,
+          "signature": {
+            "profile": "mudraid.decision.signature/1",
+            "algorithm": "RS256",
+            "key_id": "muid_sk_conformance_decision_1",
+            "claims": {
+              "profile": "mudraid.decision.signature/1",
+              "algorithm": "RS256",
+              "key_id": "muid_sk_conformance_decision_1",
+              "decision_id": "dec-expected",
+              "outcome": "allow",
+              "decision": "allow",
+              "reason_primary": "authorized",
+              "organization_id": "org-conf-1",
+              "environment": "production",
+              "platform_id": "platform-conf-1",
+              "agent_id": "agent-conf-1",
+              "subject": "client-conf-1",
+              "action_key": "crm.contacts.export",
+              "resource": "https://mcp.example.test/mcp",
+              "bundle_version": 6,
+              "policy_version": 3,
+              "decided_at": "2026-08-20T11:59:50+00:00",
+              "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+              "not_before": "2026-08-20T11:59:50+00:00",
+              "expires_at": "2026-08-20T12:04:50+00:00"
+            },
+            "signature": "cYKdlRg55E8wDy2Clr4VUnaEENpMYL0D3D0slKQNgEfTHOVpeJnu9oZLWDLDhvvRs2jNlHg2dVQm1XW+KUuxTIHmM1RCmWaI9ccONjUCGlsCMzuepLXuXfe9KZgdV3C9jF8G2g09myZPZeS+bqwS/vfaUNqzZyxhGk1xfzygasYG/O188lBFKb4P+kgwHqGQdnLF0VU8Dy2AtSyZTgrePb2k7v7u5pD0tmhumoDdJ6nbQXN+VK2fjIehUCwbkIVtKUSR/JWS945ZON17kRHUV8rxqLLpWpqnSn9h5VWrUxpZ4GUZbQwyVV9FgEEhOWJEYe+ZENByrQsuNpCn6jqY7Q=="
+          }
+        }
+      },
+      {
+        "name": "an unsigned response is still read (verify-when-present)",
+        "why": "the authority activates signing by rollout; refusing every unsigned response would make activation a flag-day. This is the DEFAULT posture in both adapters, and it is 1.1-compatible: turning the requirement on is an operator's decision, not an upgrade's",
+        "signature_valid": null,
+        "outcome": "allow",
+        "require_signed_decisions": false,
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "outcome": "allow",
+          "directive": "proceed",
+          "reason": {
+            "primary": "authorized",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false
+        }
+      },
+      {
+        "name": "an unsigned response is refused when signing is required",
+        "why": "once the authority signs every response for a surface, an UNSIGNED one there is a STRIPPED signature — the exact thing the signature exists to detect — so reading it would leave a TLS-terminating party able to remove the protection by deleting a field. Refused with its own reason, not the invalid-signature one: 'no signature at all' is a stalled rollout and 'a signature that did not check out' is a key problem or an attack, and they lead an operator to opposite actions",
+        "signature_valid": null,
+        "outcome": "error",
+        "require_signed_decisions": true,
+        "lua_refusal_reason": "DECIDE_RESPONSE_SIGNATURE_REQUIRED",
+        "response": {
+          "schema_version": "2.0",
+          "decision_id": "dec-expected",
+          "decision": "allow",
+          "outcome": "allow",
+          "directive": "proceed",
+          "reason": {
+            "primary": "authorized",
+            "contributing": [],
+            "category": null
+          },
+          "evaluation": {
+            "policy_version": 3
+          },
+          "decided_at": "2026-08-20T11:59:50+00:00",
+          "deadline_at": "2026-08-20T11:59:50.250000+00:00",
+          "action_executed": false
+        }
       }
     ]
   }

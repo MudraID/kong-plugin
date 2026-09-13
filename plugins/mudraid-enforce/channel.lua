@@ -151,6 +151,47 @@ function _M.fetch_bundle(conf)
   return body
 end
 
+--- GET /keys — the public verification-key projection (unauthenticated by
+-- design server-side; the bearer is still sent, harmlessly, because request()
+-- always attaches it). Returns the DECISION-response key series (A9-02) as a
+-- { [key_id] = public_pem } map, or nil + error.
+--
+-- Only the enforcement_decision_signing series is projected here: this
+-- gateway still verifies bundles by HMAC during the migration window
+-- (bundle.lua), and handing it the bundle keys under the same map would
+-- invite exactly the cross-series confusion the purposes exist to prevent.
+function _M.fetch_verification_keys(conf)
+  local status, body, err = request(conf, "GET", endpoints.KEYS_PATH)
+  if not status then
+    return nil, err
+  end
+  if status ~= 200 or type(body) ~= "table" then
+    return nil, "keys fetch status " .. tostring(status)
+  end
+  local sets = body.key_sets
+  if type(sets) ~= "table" then
+    -- An older control plane that publishes only the bundle series. Not an
+    -- error: the decision series simply is not published yet.
+    return {}, nil
+  end
+  local keys = {}
+  for i = 1, #sets do
+    local set = sets[i]
+    if type(set) == "table" and set.purpose == "enforcement_decision_signing"
+      and type(set.keys) == "table" then
+      for j = 1, #set.keys do
+        local entry = set.keys[j]
+        if type(entry) == "table"
+          and type(entry.key_id) == "string" and entry.key_id ~= ""
+          and type(entry.public_key_pem) == "string" and entry.public_key_pem ~= "" then
+          keys[entry.key_id] = entry.public_key_pem
+        end
+      end
+    end
+  end
+  return keys, nil
+end
+
 --- POST /acknowledgements with one report. Returns true on acceptance.
 -- A replayed report_id returns 201 with replayed=true server-side — still
 -- success here. A 409 ACK_REPLAY_MISMATCH means OUR report content drifted

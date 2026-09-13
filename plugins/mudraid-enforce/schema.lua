@@ -117,6 +117,36 @@ return {
           -- deny), it never falls back to an anonymous request.
           { decide_service_secret = { type = "string", required = false, referenceable = true } },
           { decide_timeout_ms = { type = "integer", default = 2000, between = { 100, 60000 } } },
+          -- ── Mandatory decision-response signatures (AUDIT-009 A9-02) ──────
+          --
+          -- The Kong half of the setting the Python middleware also carries
+          -- (`require_signed_decisions`), and the two must agree: a customer
+          -- running both adapters in front of one surface would otherwise have
+          -- a gateway refusing what their middleware reads.
+          --
+          -- OFF: decide.lua verifies a signature WHEN PRESENT and refuses one
+          -- that is present-and-wrong; an unsigned response is read as before.
+          -- That is the rollout posture — the authority activates signing per
+          -- surface, and refusing every unsigned response before it does would
+          -- be a flag day.
+          --
+          -- ON: an unsigned response is refused too
+          -- (DECIDE_RESPONSE_SIGNATURE_REQUIRED -> deny). This is what closes
+          -- the residual gap the rollout posture leaves open: while unsigned
+          -- responses are readable, a party able to terminate TLS can remove
+          -- the protection by DELETING a field.
+          --
+          -- CONFIGURATION, not a constant, deliberately. Turning mandatory
+          -- verification on is a staging activation step taken alongside the
+          -- Python middleware's, and the surfaces behind a fleet of gateways
+          -- reach it at different moments; a constant would make it a rebuild.
+          --
+          -- Defaults OFF, and the default is the CONTRACTED state rather than
+          -- a loophole: a gateway upgraded to this plugin version behaves
+          -- exactly as it did. In BOTH modes a present signature is verified
+          -- identically and every signature failure deny-closes — this setting
+          -- governs what an ABSENT signature means, and nothing else.
+          { require_signed_decisions = { type = "boolean", required = true, default = false } },
           -- Bundled-surface designation: request paths (prefix match) this
           -- plugin enforces on. Empty (the default) means NO surface is
           -- designated and every request passes through untouched — the
